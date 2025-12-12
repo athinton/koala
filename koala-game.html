@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Koala Apple Game</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        #gameContainer {
+            text-align: center;
+        }
+
+        #menuScreen, #gameScreen, #gameOverScreen {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+        }
+
+        h2 {
+            color: #555;
+            margin-bottom: 20px;
+        }
+
+        .button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            margin: 10px;
+            border-radius: 10px;
+            font-size: 1.2em;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .button:hover {
+            background: #764ba2;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        #gameCanvas {
+            border: 3px solid #333;
+            border-radius: 10px;
+            background: #f0f8ff;
+            display: block;
+            margin: 20px auto;
+        }
+
+        #gameInfo {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 20px;
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        #instructions {
+            margin-top: 20px;
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        #finalScore {
+            font-size: 2em;
+            color: #667eea;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <div id="menuScreen">
+            <h1>🐨 Koala Apple Game 🍎</h1>
+            <h2>Select Game Duration:</h2>
+            <button class="button" onclick="startGame(60)">1 Minute</button>
+            <button class="button" onclick="startGame(120)">2 Minutes</button>
+            <button class="button" onclick="startGame(180)">3 Minutes</button>
+            <div id="instructions">
+                <p>Use Arrow Keys to move the koala</p>
+                <p>Collect apples to score points!</p>
+                <p>Avoid the evil kangaroo!</p>
+            </div>
+        </div>
+
+        <div id="gameScreen" class="hidden">
+            <h1>🐨 Koala Apple Game 🍎</h1>
+            <div id="gameInfo">
+                <div>Score: <span id="score">0</span></div>
+                <div>Time: <span id="timer">0:00</span></div>
+            </div>
+            <canvas id="gameCanvas" width="800" height="600"></canvas>
+        </div>
+
+        <div id="gameOverScreen" class="hidden">
+            <h1>Game Over!</h1>
+            <div id="finalScore">Score: 0</div>
+            <button class="button" onclick="returnToMenu()">Play Again</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        let scurryingSound = null;
+
+        let gameState = {
+            score: 0,
+            timeLeft: 0,
+            gameActive: false,
+            koala: {
+                x: 400,
+                y: 300,
+                size: 50,
+                speed: 5,
+                dx: 0,
+                dy: 0,
+                rotation: 0,
+                isSpinning: false,
+                spinStartTime: 0
+            },
+            kangaroo: {
+                x: 100,
+                y: 100,
+                size: 55,
+                speed: 2.5
+            },
+            apples: [],
+            keys: {},
+            isMoving: false
+        };
+
+        let timerInterval;
+
+        function playCrunchSound() {
+            const duration = 0.15;
+            const now = audioCtx.currentTime;
+
+            const noise = audioCtx.createBufferSource();
+            const noiseBuffer = audioCtx.createBuffer(1, audioCtx.sampleRate * duration, audioCtx.sampleRate);
+            const output = noiseBuffer.getChannelData(0);
+
+            for (let i = 0; i < noiseBuffer.length; i++) {
+                output[i] = Math.random() * 2 - 1;
+            }
+            noise.buffer = noiseBuffer;
+
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'bandpass';
+            filter.frequency.value = 1500;
+            filter.Q.value = 2;
+
+            const gainNode = audioCtx.createGain();
+            gainNode.gain.setValueAtTime(0.3, now);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, now + duration);
+
+            noise.connect(filter);
+            filter.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            noise.start(now);
+            noise.stop(now + duration);
+        }
+
+        function startScurryingSound() {
+            if (scurryingSound) return;
+
+            const oscillator1 = audioCtx.createOscillator();
+            const oscillator2 = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+
+            oscillator1.type = 'sine';
+            oscillator1.frequency.value = 200;
+            oscillator2.type = 'sine';
+            oscillator2.frequency.value = 150;
+
+            gainNode.gain.value = 0;
+
+            oscillator1.connect(gainNode);
+            oscillator2.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            oscillator1.start();
+            oscillator2.start();
+
+            let isPlaying = false;
+            const interval = setInterval(() => {
+                if (!gameState.gameActive) {
+                    oscillator1.stop();
+                    oscillator2.stop();
+                    clearInterval(interval);
+                    scurryingSound = null;
+                    return;
+                }
+
+                const now = audioCtx.currentTime;
+                if (isPlaying) {
+                    gainNode.gain.setValueAtTime(0, now);
+                    isPlaying = false;
+                } else {
+                    gainNode.gain.setValueAtTime(0.02, now);
+                    gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+                    isPlaying = true;
+                }
+            }, 100);
+
+            scurryingSound = { oscillator1, oscillator2, gainNode, interval };
+        }
+
+        function stopScurryingSound() {
+            if (!scurryingSound) return;
+
+            const now = audioCtx.currentTime;
+            scurryingSound.gainNode.gain.setValueAtTime(scurryingSound.gainNode.gain.value, now);
+            scurryingSound.gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+
+            setTimeout(() => {
+                if (scurryingSound) {
+                    scurryingSound.oscillator1.stop();
+                    scurryingSound.oscillator2.stop();
+                    clearInterval(scurryingSound.interval);
+                    scurryingSound = null;
+                }
+            }, 150);
+        }
+
+        function playBonkSound() {
+            const now = audioCtx.currentTime;
+            const duration = 0.5;
+
+            const osc1 = audioCtx.createOscillator();
+            const osc2 = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+
+            osc1.type = 'sine';
+            osc2.type = 'sine';
+
+            osc1.frequency.setValueAtTime(600, now);
+            osc1.frequency.exponentialRampToValueAtTime(200, now + 0.2);
+            osc2.frequency.setValueAtTime(400, now);
+            osc2.frequency.exponentialRampToValueAtTime(150, now + 0.2);
+
+            gainNode.gain.setValueAtTime(0.3, now);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, now + duration);
+
+            osc1.connect(gainNode);
+            osc2.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            osc1.start(now);
+            osc2.start(now);
+            osc1.stop(now + duration);
+            osc2.stop(now + duration);
+        }
+
+        function startGame(duration) {
+            gameState.score = 0;
+            gameState.timeLeft = duration;
+            gameState.gameActive = true;
+            gameState.koala.x = 400;
+            gameState.koala.y = 300;
+            gameState.koala.dx = 0;
+            gameState.koala.dy = 0;
+            gameState.koala.rotation = 0;
+            gameState.koala.isSpinning = false;
+            gameState.kangaroo.x = Math.random() * (canvas.width - 100) + 50;
+            gameState.kangaroo.y = Math.random() * (canvas.height - 100) + 50;
+            gameState.apples = [];
+            gameState.keys = {};
+
+            document.getElementById('menuScreen').classList.add('hidden');
+            document.getElementById('gameScreen').classList.remove('hidden');
+            document.getElementById('gameOverScreen').classList.add('hidden');
+
+            updateScore();
+            updateTimer();
+
+            spawnApple();
+            spawnApple();
+            spawnApple();
+
+            timerInterval = setInterval(() => {
+                gameState.timeLeft--;
+                updateTimer();
+
+                if (gameState.timeLeft <= 0) {
+                    endGame();
+                }
+            }, 1000);
+
+            gameLoop();
+        }
+
+        function endGame() {
+            gameState.gameActive = false;
+            clearInterval(timerInterval);
+            stopScurryingSound();
+
+            document.getElementById('gameScreen').classList.add('hidden');
+            document.getElementById('gameOverScreen').classList.remove('hidden');
+            document.getElementById('finalScore').textContent = `Score: ${gameState.score}`;
+        }
+
+        function returnToMenu() {
+            document.getElementById('gameOverScreen').classList.add('hidden');
+            document.getElementById('menuScreen').classList.remove('hidden');
+        }
+
+        function spawnApple() {
+            const apple = {
+                x: Math.random() * (canvas.width - 40) + 20,
+                y: Math.random() * (canvas.height - 40) + 20,
+                size: 30
+            };
+            gameState.apples.push(apple);
+        }
+
+        function updateScore() {
+            document.getElementById('score').textContent = gameState.score;
+        }
+
+        function updateTimer() {
+            const minutes = Math.floor(gameState.timeLeft / 60);
+            const seconds = gameState.timeLeft % 60;
+            document.getElementById('timer').textContent =
+                `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        function drawKoala() {
+            const k = gameState.koala;
+
+            ctx.save();
+            ctx.translate(k.x, k.y);
+            ctx.rotate(k.rotation);
+            ctx.translate(-k.x, -k.y);
+
+            ctx.fillStyle = '#8B8B8B';
+            ctx.beginPath();
+            ctx.arc(k.x - 20, k.y - 12, 16, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(k.x + 20, k.y - 12, 16, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#E8E8E8';
+            ctx.beginPath();
+            ctx.arc(k.x - 20, k.y - 12, 10, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(k.x + 20, k.y - 12, 10, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#A9A9A9';
+            ctx.beginPath();
+            ctx.arc(k.x, k.y, k.size / 2, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#D3D3D3';
+            ctx.beginPath();
+            ctx.ellipse(k.x, k.y + 8, 18, 16, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#000';
+            ctx.beginPath();
+            ctx.arc(k.x - 8, k.y - 3, 4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(k.x + 8, k.y - 3, 4, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#1a1a1a';
+            ctx.beginPath();
+            ctx.ellipse(k.x, k.y + 8, 7, 9, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        function drawKangaroo() {
+            const kan = gameState.kangaroo;
+
+            ctx.fillStyle = '#8B4513';
+            ctx.beginPath();
+            ctx.ellipse(kan.x, kan.y + 15, 12, 20, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#A0522D';
+            ctx.beginPath();
+            ctx.arc(kan.x, kan.y - 5, kan.size / 2.2, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#8B4513';
+            ctx.beginPath();
+            ctx.arc(kan.x - 12, kan.y - 10, 8, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(kan.x + 12, kan.y - 10, 8, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#D2691E';
+            ctx.beginPath();
+            ctx.ellipse(kan.x, kan.y, 10, 12, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#FF0000';
+            ctx.beginPath();
+            ctx.arc(kan.x - 6, kan.y - 8, 3, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(kan.x + 6, kan.y - 8, 3, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(kan.x - 8, kan.y + 3);
+            ctx.lineTo(kan.x, kan.y + 1);
+            ctx.lineTo(kan.x + 8, kan.y + 3);
+            ctx.stroke();
+
+            ctx.fillStyle = '#654321';
+            ctx.beginPath();
+            ctx.ellipse(kan.x - 15, kan.y + 25, 6, 10, 0.3, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(kan.x + 15, kan.y + 25, 6, 10, -0.3, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function drawApple(apple) {
+            ctx.fillStyle = '#FF4444';
+            ctx.beginPath();
+            ctx.arc(apple.x, apple.y, apple.size / 2, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#8B4513';
+            ctx.fillRect(apple.x - 2, apple.y - apple.size / 2 - 5, 4, 8);
+
+            ctx.fillStyle = '#228B22';
+            ctx.beginPath();
+            ctx.ellipse(apple.x + 5, apple.y - apple.size / 2 - 5, 8, 5, -0.3, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function checkCollision(obj1, obj2, size1, size2) {
+            const distance = Math.sqrt(
+                Math.pow(obj1.x - obj2.x, 2) + Math.pow(obj1.y - obj2.y, 2)
+            );
+            return distance < (size1 + size2) / 2;
+        }
+
+        function update() {
+            if (!gameState.gameActive) return;
+
+            if (gameState.keys['ArrowUp']) gameState.koala.dy = -gameState.koala.speed;
+            else if (gameState.keys['ArrowDown']) gameState.koala.dy = gameState.koala.speed;
+            else gameState.koala.dy = 0;
+
+            if (gameState.keys['ArrowLeft']) gameState.koala.dx = -gameState.koala.speed;
+            else if (gameState.keys['ArrowRight']) gameState.koala.dx = gameState.koala.speed;
+            else gameState.koala.dx = 0;
+
+            const isMoving = gameState.koala.dx !== 0 || gameState.koala.dy !== 0;
+            if (isMoving && !gameState.isMoving) {
+                startScurryingSound();
+            } else if (!isMoving && gameState.isMoving) {
+                stopScurryingSound();
+            }
+            gameState.isMoving = isMoving;
+
+            gameState.koala.x += gameState.koala.dx;
+            gameState.koala.y += gameState.koala.dy;
+
+            const halfSize = gameState.koala.size / 2;
+            if (gameState.koala.x - halfSize < 0) gameState.koala.x = halfSize;
+            if (gameState.koala.x + halfSize > canvas.width) gameState.koala.x = canvas.width - halfSize;
+            if (gameState.koala.y - halfSize < 0) gameState.koala.y = halfSize;
+            if (gameState.koala.y + halfSize > canvas.height) gameState.koala.y = canvas.height - halfSize;
+
+            for (let i = gameState.apples.length - 1; i >= 0; i--) {
+                if (checkCollision(gameState.koala, gameState.apples[i], gameState.koala.size, gameState.apples[i].size)) {
+                    gameState.apples.splice(i, 1);
+                    gameState.score++;
+                    updateScore();
+                    spawnApple();
+                    playCrunchSound();
+                }
+            }
+
+            if (gameState.koala.isSpinning) {
+                const elapsed = Date.now() - gameState.koala.spinStartTime;
+                const spinDuration = 800;
+                if (elapsed < spinDuration) {
+                    gameState.koala.rotation = (elapsed / spinDuration) * Math.PI * 2;
+                } else {
+                    gameState.koala.isSpinning = false;
+                    gameState.koala.rotation = 0;
+                }
+            }
+
+            if (!gameState.koala.isSpinning) {
+                const dx = gameState.koala.x - gameState.kangaroo.x;
+                const dy = gameState.koala.y - gameState.kangaroo.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                if (distance > 0) {
+                    gameState.kangaroo.x += (dx / distance) * gameState.kangaroo.speed;
+                    gameState.kangaroo.y += (dy / distance) * gameState.kangaroo.speed;
+                }
+
+                if (checkCollision(gameState.koala, gameState.kangaroo, gameState.koala.size, gameState.kangaroo.size)) {
+                    gameState.koala.isSpinning = true;
+                    gameState.koala.spinStartTime = Date.now();
+                    gameState.score = Math.max(0, gameState.score - 1);
+                    updateScore();
+                    playBonkSound();
+
+                    gameState.koala.x = Math.random() * (canvas.width - 100) + 50;
+                    gameState.koala.y = Math.random() * (canvas.height - 100) + 50;
+                }
+            }
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            gameState.apples.forEach(apple => drawApple(apple));
+            drawKangaroo();
+            drawKoala();
+        }
+
+        function gameLoop() {
+            update();
+            draw();
+
+            if (gameState.gameActive) {
+                requestAnimationFrame(gameLoop);
+            }
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+                e.preventDefault();
+                gameState.keys[e.key] = true;
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+                gameState.keys[e.key] = false;
+            }
+        });
+    </script>
+</body>
+</html>

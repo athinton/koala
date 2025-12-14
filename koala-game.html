@@ -423,13 +423,28 @@
             document.getElementById('menuScreen').classList.remove('hidden');
         }
 
-        function spawnApple() {
+        function spawnApple(type = 'regular') {
             const apple = {
                 x: Math.random() * (canvas.width - 40) + 20,
                 y: Math.random() * (canvas.height - 40) + 20,
-                size: 30
+                size: 30,
+                type: type,
+                spawnTime: Date.now(),
+                points: type === 'diamond' ? 10 : type === 'golden' ? 5 : 1,
+                duration: type === 'diamond' ? 5000 : type === 'golden' ? 10000 : null
             };
             gameState.apples.push(apple);
+        }
+
+        function trySpawnSpecialApple() {
+            const rand = Math.random();
+            if (rand < 0.02) {
+                // 2% chance for diamond apple (very rare)
+                spawnApple('diamond');
+            } else if (rand < 0.08) {
+                // 6% chance for golden apple (rare but more common than diamond)
+                spawnApple('golden');
+            }
         }
 
         function updateScore() {
@@ -496,59 +511,168 @@
         function drawKangaroo() {
             const kan = gameState.kangaroo;
 
-            ctx.fillStyle = '#8B4513';
+            // Thick tail curving behind
+            ctx.fillStyle = '#8B7355';
             ctx.beginPath();
-            ctx.ellipse(kan.x, kan.y + 15, 12, 20, 0, 0, Math.PI * 2);
+            ctx.moveTo(kan.x + 5, kan.y + 20);
+            ctx.quadraticCurveTo(kan.x + 35, kan.y + 15, kan.x + 40, kan.y + 35);
+            ctx.quadraticCurveTo(kan.x + 38, kan.y + 42, kan.x + 30, kan.y + 40);
+            ctx.quadraticCurveTo(kan.x + 25, kan.y + 25, kan.x + 5, kan.y + 25);
             ctx.fill();
 
-            ctx.fillStyle = '#A0522D';
+            // Back legs (large and powerful)
+            ctx.fillStyle = '#9C8B7A';
             ctx.beginPath();
-            ctx.arc(kan.x, kan.y - 5, kan.size / 2.2, 0, Math.PI * 2);
+            ctx.ellipse(kan.x - 12, kan.y + 30, 10, 18, 0.2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(kan.x + 8, kan.y + 30, 10, 18, -0.2, 0, Math.PI * 2);
             ctx.fill();
 
-            ctx.fillStyle = '#8B4513';
+            // Large feet
+            ctx.fillStyle = '#6B5B4F';
             ctx.beginPath();
-            ctx.arc(kan.x - 12, kan.y - 10, 8, 0, Math.PI * 2);
+            ctx.ellipse(kan.x - 18, kan.y + 45, 12, 6, 0.3, 0, Math.PI * 2);
             ctx.fill();
             ctx.beginPath();
-            ctx.arc(kan.x + 12, kan.y - 10, 8, 0, Math.PI * 2);
-            ctx.fill();
-
-            ctx.fillStyle = '#D2691E';
-            ctx.beginPath();
-            ctx.ellipse(kan.x, kan.y, 10, 12, 0, 0, Math.PI * 2);
+            ctx.ellipse(kan.x + 14, kan.y + 45, 12, 6, -0.3, 0, Math.PI * 2);
             ctx.fill();
 
-            ctx.fillStyle = '#FF0000';
+            // Main body
+            ctx.fillStyle = '#A0917B';
             ctx.beginPath();
-            ctx.arc(kan.x - 6, kan.y - 8, 3, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.beginPath();
-            ctx.arc(kan.x + 6, kan.y - 8, 3, 0, Math.PI * 2);
+            ctx.ellipse(kan.x, kan.y + 10, 18, 25, 0, 0, Math.PI * 2);
             ctx.fill();
 
-            ctx.strokeStyle = '#000';
-            ctx.lineWidth = 2;
+            // Lighter belly/chest
+            ctx.fillStyle = '#D4C4B0';
             ctx.beginPath();
-            ctx.moveTo(kan.x - 8, kan.y + 3);
-            ctx.lineTo(kan.x, kan.y + 1);
-            ctx.lineTo(kan.x + 8, kan.y + 3);
+            ctx.ellipse(kan.x, kan.y + 12, 12, 18, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Small front arms/paws
+            ctx.fillStyle = '#9C8B7A';
+            ctx.beginPath();
+            ctx.ellipse(kan.x - 14, kan.y + 2, 5, 10, 0.4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(kan.x + 14, kan.y + 2, 5, 10, -0.4, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Paw details
+            ctx.fillStyle = '#6B5B4F';
+            ctx.beginPath();
+            ctx.arc(kan.x - 16, kan.y + 10, 4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(kan.x + 16, kan.y + 10, 4, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Head
+            ctx.fillStyle = '#A0917B';
+            ctx.beginPath();
+            ctx.ellipse(kan.x, kan.y - 18, 14, 16, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Snout/muzzle
+            ctx.fillStyle = '#B8A898';
+            ctx.beginPath();
+            ctx.ellipse(kan.x, kan.y - 10, 8, 10, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Ears (tall and pointed)
+            ctx.fillStyle = '#9C8B7A';
+            ctx.beginPath();
+            ctx.ellipse(kan.x - 10, kan.y - 35, 5, 12, -0.2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(kan.x + 10, kan.y - 35, 5, 12, 0.2, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Inner ears
+            ctx.fillStyle = '#DBC8B8';
+            ctx.beginPath();
+            ctx.ellipse(kan.x - 10, kan.y - 34, 3, 8, -0.2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(kan.x + 10, kan.y - 34, 3, 8, 0.2, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Eyes
+            ctx.fillStyle = '#2C1810';
+            ctx.beginPath();
+            ctx.ellipse(kan.x - 6, kan.y - 20, 3, 4, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(kan.x + 6, kan.y - 20, 3, 4, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Eye highlights
+            ctx.fillStyle = '#FFFFFF';
+            ctx.beginPath();
+            ctx.arc(kan.x - 5, kan.y - 21, 1.5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(kan.x + 7, kan.y - 21, 1.5, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Nose
+            ctx.fillStyle = '#4A3728';
+            ctx.beginPath();
+            ctx.ellipse(kan.x, kan.y - 8, 4, 3, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Mouth
+            ctx.strokeStyle = '#5C4033';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(kan.x - 4, kan.y - 4);
+            ctx.quadraticCurveTo(kan.x, kan.y - 2, kan.x + 4, kan.y - 4);
             ctx.stroke();
-
-            ctx.fillStyle = '#654321';
-            ctx.beginPath();
-            ctx.ellipse(kan.x - 15, kan.y + 25, 6, 10, 0.3, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.beginPath();
-            ctx.ellipse(kan.x + 15, kan.y + 25, 6, 10, -0.3, 0, Math.PI * 2);
-            ctx.fill();
         }
 
         function drawApple(apple) {
-            ctx.fillStyle = '#FF4444';
+            // Set color based on apple type
+            if (apple.type === 'diamond') {
+                // Diamond apple - cyan/blue sparkle effect
+                const gradient = ctx.createRadialGradient(apple.x - 3, apple.y - 3, 0, apple.x, apple.y, apple.size / 2);
+                gradient.addColorStop(0, '#FFFFFF');
+                gradient.addColorStop(0.3, '#00FFFF');
+                gradient.addColorStop(0.7, '#00BFFF');
+                gradient.addColorStop(1, '#1E90FF');
+                ctx.fillStyle = gradient;
+            } else if (apple.type === 'golden') {
+                // Golden apple - shiny gold effect
+                const gradient = ctx.createRadialGradient(apple.x - 3, apple.y - 3, 0, apple.x, apple.y, apple.size / 2);
+                gradient.addColorStop(0, '#FFFACD');
+                gradient.addColorStop(0.4, '#FFD700');
+                gradient.addColorStop(0.8, '#FFA500');
+                gradient.addColorStop(1, '#B8860B');
+                ctx.fillStyle = gradient;
+            } else {
+                // Regular red apple
+                ctx.fillStyle = '#FF4444';
+            }
+
             ctx.beginPath();
             ctx.arc(apple.x, apple.y, apple.size / 2, 0, Math.PI * 2);
             ctx.fill();
+
+            // Add sparkle effect for special apples
+            if (apple.type === 'diamond' || apple.type === 'golden') {
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+                ctx.beginPath();
+                ctx.arc(apple.x - 5, apple.y - 5, 4, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Pulsing glow effect
+                const pulse = Math.sin(Date.now() / 200) * 0.3 + 0.7;
+                ctx.strokeStyle = apple.type === 'diamond' ? `rgba(0, 255, 255, ${pulse})` : `rgba(255, 215, 0, ${pulse})`;
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(apple.x, apple.y, apple.size / 2 + 3, 0, Math.PI * 2);
+                ctx.stroke();
+            }
 
             ctx.fillStyle = '#8B4513';
             ctx.fillRect(apple.x - 2, apple.y - apple.size / 2 - 5, 4, 8);
@@ -594,14 +718,32 @@
             if (gameState.koala.y - halfSize < 0) gameState.koala.y = halfSize;
             if (gameState.koala.y + halfSize > canvas.height) gameState.koala.y = canvas.height - halfSize;
 
+            // Remove expired special apples
+            const now = Date.now();
+            for (let i = gameState.apples.length - 1; i >= 0; i--) {
+                const apple = gameState.apples[i];
+                if (apple.duration && (now - apple.spawnTime) > apple.duration) {
+                    gameState.apples.splice(i, 1);
+                }
+            }
+
             for (let i = gameState.apples.length - 1; i >= 0; i--) {
                 if (checkCollision(gameState.koala, gameState.apples[i], gameState.koala.size, gameState.apples[i].size)) {
+                    const apple = gameState.apples[i];
                     gameState.apples.splice(i, 1);
-                    gameState.score++;
+                    gameState.score += apple.points || 1;
                     updateScore();
-                    spawnApple();
+                    // Only spawn a new regular apple if we collected a regular one
+                    if (apple.type === 'regular' || !apple.type) {
+                        spawnApple();
+                    }
                     playCrunchSound();
                 }
+            }
+
+            // Try to spawn special apples occasionally
+            if (Math.random() < 0.01) {
+                trySpawnSpecialApple();
             }
 
             if (gameState.koala.isSpinning) {

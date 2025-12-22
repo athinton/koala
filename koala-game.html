@@ -181,6 +181,7 @@
             <button class="button" onclick="startGame(60)">1 Minute</button>
             <button class="button" onclick="startGame(120)">2 Minutes</button>
             <button class="button" onclick="startGame(180)">3 Minutes</button>
+            <button class="button" onclick="startGame(0)">Endless</button>
             <div id="instructions">
                 <p>Use Arrow Keys to move the koala</p>
                 <p>Collect apples to score points!</p>
@@ -193,6 +194,7 @@
             <div id="gameInfo">
                 <div>Score: <span id="score">0</span></div>
                 <div>Time: <span id="timer">0:00</span></div>
+                <button id="endGameBtn" class="button hidden" onclick="endGame()" style="padding: 8px 16px; font-size: 0.9em;">End Game</button>
             </div>
             <canvas id="gameCanvas" width="800" height="600"></canvas>
             <div id="mobileControls">
@@ -372,6 +374,7 @@
         function startGame(duration) {
             gameState.score = 0;
             gameState.timeLeft = duration;
+            gameState.endless = duration === 0;
             gameState.gameActive = true;
             gameState.kangarooEnabled = document.getElementById('kangarooToggle').checked;
             gameState.koala.x = 400;
@@ -389,6 +392,14 @@
             document.getElementById('gameScreen').classList.remove('hidden');
             document.getElementById('gameOverScreen').classList.add('hidden');
 
+            // Show/hide end game button based on mode
+            const endGameBtn = document.getElementById('endGameBtn');
+            if (gameState.endless) {
+                endGameBtn.classList.remove('hidden');
+            } else {
+                endGameBtn.classList.add('hidden');
+            }
+
             updateScore();
             updateTimer();
 
@@ -396,14 +407,23 @@
             spawnApple();
             spawnApple();
 
-            timerInterval = setInterval(() => {
-                gameState.timeLeft--;
-                updateTimer();
+            // Start appropriate timer based on mode
+            if (gameState.endless) {
+                gameState.elapsedTime = 0;
+                timerInterval = setInterval(() => {
+                    gameState.elapsedTime++;
+                    updateTimer();
+                }, 1000);
+            } else {
+                timerInterval = setInterval(() => {
+                    gameState.timeLeft--;
+                    updateTimer();
 
-                if (gameState.timeLeft <= 0) {
-                    endGame();
-                }
-            }, 1000);
+                    if (gameState.timeLeft <= 0) {
+                        endGame();
+                    }
+                }, 1000);
+            }
 
             gameLoop();
         }
@@ -452,10 +472,17 @@
         }
 
         function updateTimer() {
-            const minutes = Math.floor(gameState.timeLeft / 60);
-            const seconds = gameState.timeLeft % 60;
-            document.getElementById('timer').textContent =
-                `${minutes}:${seconds.toString().padStart(2, '0')}`;
+            if (gameState.endless) {
+                const minutes = Math.floor(gameState.elapsedTime / 60);
+                const seconds = gameState.elapsedTime % 60;
+                document.getElementById('timer').textContent =
+                    `∞ (${minutes}:${seconds.toString().padStart(2, '0')})`;
+            } else {
+                const minutes = Math.floor(gameState.timeLeft / 60);
+                const seconds = gameState.timeLeft % 60;
+                document.getElementById('timer').textContent =
+                    `${minutes}:${seconds.toString().padStart(2, '0')}`;
+            }
         }
 
         function drawKoala() {

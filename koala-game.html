@@ -896,15 +896,48 @@
             return distance < (size1 + size2) / 2;
         }
 
+        function getGamepadInput() {
+            const input = { up: false, down: false, left: false, right: false };
+            const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+
+            for (const gamepad of gamepads) {
+                if (!gamepad) continue;
+
+                // D-pad buttons (standard mapping)
+                if (gamepad.buttons[12]?.pressed) input.up = true;
+                if (gamepad.buttons[13]?.pressed) input.down = true;
+                if (gamepad.buttons[14]?.pressed) input.left = true;
+                if (gamepad.buttons[15]?.pressed) input.right = true;
+
+                // Left analog stick (with deadzone)
+                const deadzone = 0.3;
+                const leftX = gamepad.axes[0] || 0;
+                const leftY = gamepad.axes[1] || 0;
+
+                if (leftX < -deadzone) input.left = true;
+                if (leftX > deadzone) input.right = true;
+                if (leftY < -deadzone) input.up = true;
+                if (leftY > deadzone) input.down = true;
+            }
+            return input;
+        }
+
         function update() {
             if (!gameState.gameActive) return;
 
-            if (gameState.keys['ArrowUp']) gameState.koala.dy = -gameState.koala.speed;
-            else if (gameState.keys['ArrowDown']) gameState.koala.dy = gameState.koala.speed;
+            // Combine keyboard and gamepad input
+            const gamepadInput = getGamepadInput();
+            const up = gameState.keys['ArrowUp'] || gamepadInput.up;
+            const down = gameState.keys['ArrowDown'] || gamepadInput.down;
+            const left = gameState.keys['ArrowLeft'] || gamepadInput.left;
+            const right = gameState.keys['ArrowRight'] || gamepadInput.right;
+
+            if (up) gameState.koala.dy = -gameState.koala.speed;
+            else if (down) gameState.koala.dy = gameState.koala.speed;
             else gameState.koala.dy = 0;
 
-            if (gameState.keys['ArrowLeft']) gameState.koala.dx = -gameState.koala.speed;
-            else if (gameState.keys['ArrowRight']) gameState.koala.dx = gameState.koala.speed;
+            if (left) gameState.koala.dx = -gameState.koala.speed;
+            else if (right) gameState.koala.dx = gameState.koala.speed;
             else gameState.koala.dx = 0;
 
             const isMoving = gameState.koala.dx !== 0 || gameState.koala.dy !== 0;

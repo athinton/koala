@@ -2,8 +2,12 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
     <title>Koala Apple Game</title>
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐨</text></svg>">
     <style>
         * {
             margin: 0;
@@ -201,6 +205,52 @@
             background: rgba(0, 0, 0, 0.7);
         }
 
+        #iosPrompt {
+            display: none;
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 12px;
+            font-size: 14px;
+            text-align: center;
+            z-index: 1000;
+            max-width: 300px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+        }
+
+        #iosPrompt.show {
+            display: block;
+            animation: slideUp 0.3s ease-out;
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+            to { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+
+        #iosPrompt .close-btn {
+            position: absolute;
+            top: 5px;
+            right: 10px;
+            background: none;
+            border: none;
+            color: white;
+            font-size: 18px;
+            cursor: pointer;
+        }
+
+        #iosPrompt .share-icon {
+            display: inline-block;
+            border: 2px solid white;
+            border-radius: 4px;
+            padding: 2px 5px;
+            margin: 0 3px;
+        }
+
         .control-btn {
             width: 70px;
             height: 70px;
@@ -319,6 +369,11 @@
     </style>
 </head>
 <body>
+    <div id="iosPrompt">
+        <button class="close-btn" onclick="document.getElementById('iosPrompt').classList.remove('show')">×</button>
+        For fullscreen: tap <span class="share-icon">⎙</span> then<br>"Add to Home Screen"
+    </div>
+
     <div id="gameContainer">
         <div id="menuScreen">
             <h1>🐨 Koala Apple Game 🍎</h1>
@@ -1263,9 +1318,22 @@
         });
 
         // Fullscreen toggle
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+                      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        const isStandalone = window.navigator.standalone === true;
+
         document.getElementById('fullscreenBtn').addEventListener('click', () => {
+            // On iOS (not standalone), show the Add to Home Screen prompt
+            if (isIOS && !isStandalone) {
+                const prompt = document.getElementById('iosPrompt');
+                prompt.classList.add('show');
+                // Auto-hide after 6 seconds
+                setTimeout(() => prompt.classList.remove('show'), 6000);
+                return;
+            }
+
             const container = document.getElementById('gameScreen');
-            if (!document.fullscreenElement) {
+            if (!document.fullscreenElement && !document.webkitFullscreenElement) {
                 if (container.requestFullscreen) {
                     container.requestFullscreen();
                 } else if (container.webkitRequestFullscreen) {
@@ -1281,6 +1349,11 @@
                 }
             }
         });
+
+        // Hide fullscreen button if already in standalone mode on iOS
+        if (isIOS && isStandalone) {
+            document.getElementById('fullscreenBtn').style.display = 'none';
+        }
 
         // Gamepad activity detection - hide overlay when gamepad is used
         let gamepadActivityTimeout = null;

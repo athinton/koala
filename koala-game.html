@@ -136,20 +136,17 @@
 
         #overlayControls {
             display: none;
-            position: absolute;
+            position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
             pointer-events: none;
-        }
-
-        #overlayControls.active {
-            display: block;
+            z-index: 100;
         }
 
         #overlayControls .overlay-btn {
-            position: absolute;
+            position: fixed;
             width: 60px;
             height: 60px;
             font-size: 22px;
@@ -173,13 +170,13 @@
             transition: opacity 0.3s;
         }
 
-        /* Left side controls */
-        #overlayLeft { left: 15px; bottom: 80px; }
-        #overlayDown { left: 15px; bottom: 10px; }
+        /* Left side controls - fixed to screen edge */
+        #overlayLeft { left: 10px; bottom: 85px; }
+        #overlayDown { left: 10px; bottom: 15px; }
 
-        /* Right side controls */
-        #overlayRight { right: 15px; bottom: 80px; }
-        #overlayUp { right: 15px; bottom: 10px; }
+        /* Right side controls - fixed to screen edge */
+        #overlayRight { right: 10px; bottom: 85px; }
+        #overlayUp { right: 10px; bottom: 15px; }
 
         #canvasContainer {
             position: relative;
@@ -406,12 +403,12 @@
             <div id="canvasContainer">
                 <canvas id="gameCanvas" width="800" height="600"></canvas>
                 <button id="fullscreenBtn" title="Toggle Fullscreen">⛶</button>
-                <div id="overlayControls">
-                    <button class="overlay-btn" id="overlayUp">▲</button>
-                    <button class="overlay-btn" id="overlayDown">▼</button>
-                    <button class="overlay-btn" id="overlayLeft">◀</button>
-                    <button class="overlay-btn" id="overlayRight">▶</button>
-                </div>
+            </div>
+            <div id="overlayControls">
+                <button class="overlay-btn" id="overlayUp">▲</button>
+                <button class="overlay-btn" id="overlayDown">▼</button>
+                <button class="overlay-btn" id="overlayLeft">◀</button>
+                <button class="overlay-btn" id="overlayRight">▶</button>
             </div>
             <div id="mobileControls">
                 <button class="control-btn" id="upBtn">▲</button>

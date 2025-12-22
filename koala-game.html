@@ -148,6 +148,51 @@
             box-shadow: inset 0 3px 10px rgba(0, 0, 0, 0.3);
         }
 
+        #luckContainer {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        #luckBar {
+            width: 80px;
+            height: 16px;
+            background: #ddd;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 2px solid #333;
+        }
+
+        #luckFill {
+            height: 100%;
+            background: linear-gradient(90deg, #FFD700, #FFA500);
+            transition: width 0.3s ease;
+        }
+
+        #luckNotification {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: linear-gradient(135deg, #FFD700, #FFA500);
+            color: #333;
+            padding: 20px 40px;
+            border-radius: 15px;
+            font-size: 1.5em;
+            font-weight: bold;
+            box-shadow: 0 5px 30px rgba(255, 215, 0, 0.6);
+            z-index: 1000;
+            animation: luckPopup 2s ease-out forwards;
+        }
+
+        @keyframes luckPopup {
+            0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+            20% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
+            30% { transform: translate(-50%, -50%) scale(1); }
+            80% { opacity: 1; }
+            100% { opacity: 0; transform: translate(-50%, -60%) scale(0.8); }
+        }
+
         @media (max-width: 900px) {
             #gameCanvas {
                 max-width: 100%;
@@ -194,6 +239,9 @@
             <div id="gameInfo">
                 <div>Score: <span id="score">0</span></div>
                 <div>Time: <span id="timer">0:00</span></div>
+                <div id="luckContainer">
+                    Luck: <div id="luckBar"><div id="luckFill" style="width: 50%;"></div></div>
+                </div>
                 <button id="endGameBtn" class="button hidden" onclick="endGame()" style="padding: 8px 16px; font-size: 0.9em;">End Game</button>
             </div>
             <canvas id="gameCanvas" width="800" height="600"></canvas>
@@ -226,6 +274,8 @@
             timeLeft: 0,
             gameActive: false,
             kangarooEnabled: true,
+            luck: 0.5,
+            luckLevel: 0,
             koala: {
                 x: 400,
                 y: 300,
@@ -377,6 +427,8 @@
             gameState.endless = duration === 0;
             gameState.gameActive = true;
             gameState.kangarooEnabled = document.getElementById('kangarooToggle').checked;
+            gameState.luck = 0.5;
+            gameState.luckLevel = 0;
             gameState.koala.x = 400;
             gameState.koala.y = 300;
             gameState.koala.dx = 0;
@@ -402,6 +454,7 @@
 
             updateScore();
             updateTimer();
+            updateLuckBar();
 
             spawnApple();
             spawnApple();
@@ -447,10 +500,10 @@
             const apple = {
                 x: Math.random() * (canvas.width - 40) + 20,
                 y: Math.random() * (canvas.height - 40) + 20,
-                size: 30,
+                size: type === 'rainbow' ? 35 : 30,
                 type: type,
                 spawnTime: Date.now(),
-                points: type === 'diamond' ? 10 : type === 'golden' ? 5 : 1,
+                points: type === 'rainbow' ? 15 : type === 'diamond' ? 10 : type === 'golden' ? 5 : 1,
                 duration: type === 'diamond' ? 5000 : type === 'golden' ? 10000 : null
             };
             gameState.apples.push(apple);
@@ -458,12 +511,69 @@
 
         function trySpawnSpecialApple() {
             const rand = Math.random();
-            if (rand < 0.02) {
-                // 2% chance for diamond apple (very rare)
+            const diamondChance = 0.02 * gameState.luck;
+            const goldenChance = 0.06 * gameState.luck;
+
+            // Rainbow apple only spawns at max luck
+            if (gameState.luckLevel >= 3) {
+                const rainbowChance = 0.01; // 1% chance when at max luck
+                const hasRainbow = gameState.apples.some(a => a.type === 'rainbow');
+                // In timed mode, only one rainbow allowed; in endless, unlimited
+                const canSpawnRainbow = gameState.endless || !hasRainbow;
+
+                if (rand < rainbowChance && canSpawnRainbow) {
+                    spawnApple('rainbow');
+                    return;
+                }
+            }
+
+            if (rand < diamondChance) {
+                // Diamond apple (very rare, affected by luck)
                 spawnApple('diamond');
-            } else if (rand < 0.08) {
-                // 6% chance for golden apple (rare but more common than diamond)
+            } else if (rand < diamondChance + goldenChance) {
+                // Golden apple (rare, affected by luck)
                 spawnApple('golden');
+            }
+        }
+
+        function updateLuckBar() {
+            // Luck ranges from 0.5 (base) to 2 (max at level 3)
+            // Bar shows 0% at 0.5 luck, 100% at 2 luck
+            const percentage = ((gameState.luck - 0.5) / 1.5) * 100;
+            document.getElementById('luckFill').style.width = `${percentage}%`;
+        }
+
+        function showLuckNotification(level) {
+            const messages = {
+                1: '🍀 Luck Up! (1.5x)',
+                2: '🍀🍀 Luck Up! (2x)',
+                3: '🍀🍀🍀 MAX LUCK!'
+            };
+            const notification = document.createElement('div');
+            notification.id = 'luckNotification';
+            notification.textContent = messages[level] || 'Luck Up!';
+            document.body.appendChild(notification);
+            setTimeout(() => notification.remove(), 2000);
+        }
+
+        function checkLuckMilestone(oldScore, newScore) {
+            // Level 1: score reaches 50 (luck 0.5 -> 1)
+            // Level 2: score reaches 100 (luck 1 -> 1.5)
+            // Level 3: score reaches 150 (luck 1.5 -> 2)
+            const milestones = [
+                { score: 50, luck: 1, level: 1 },
+                { score: 100, luck: 1.5, level: 2 },
+                { score: 150, luck: 2, level: 3 }
+            ];
+
+            for (const milestone of milestones) {
+                if (oldScore < milestone.score && newScore >= milestone.score && gameState.luckLevel < milestone.level) {
+                    gameState.luck = milestone.luck;
+                    gameState.luckLevel = milestone.level;
+                    updateLuckBar();
+                    showLuckNotification(milestone.level);
+                    break;
+                }
             }
         }
 
@@ -660,7 +770,23 @@
 
         function drawApple(apple) {
             // Set color based on apple type
-            if (apple.type === 'diamond') {
+            if (apple.type === 'rainbow') {
+                // Rainbow apple - animated rainbow gradient
+                const time = Date.now() / 500;
+                const gradient = ctx.createLinearGradient(
+                    apple.x - apple.size / 2, apple.y - apple.size / 2,
+                    apple.x + apple.size / 2, apple.y + apple.size / 2
+                );
+                // Rotating rainbow colors
+                const offset = (time % 1);
+                gradient.addColorStop((0 + offset) % 1, '#FF0000');
+                gradient.addColorStop((0.17 + offset) % 1, '#FF7F00');
+                gradient.addColorStop((0.33 + offset) % 1, '#FFFF00');
+                gradient.addColorStop((0.5 + offset) % 1, '#00FF00');
+                gradient.addColorStop((0.67 + offset) % 1, '#0000FF');
+                gradient.addColorStop((0.83 + offset) % 1, '#8B00FF');
+                ctx.fillStyle = gradient;
+            } else if (apple.type === 'diamond') {
                 // Diamond apple - cyan/blue sparkle effect
                 const gradient = ctx.createRadialGradient(apple.x - 3, apple.y - 3, 0, apple.x, apple.y, apple.size / 2);
                 gradient.addColorStop(0, '#FFFFFF');
@@ -686,7 +812,24 @@
             ctx.fill();
 
             // Add sparkle effect for special apples
-            if (apple.type === 'diamond' || apple.type === 'golden') {
+            if (apple.type === 'rainbow') {
+                // Rainbow glow effect
+                const pulse = Math.sin(Date.now() / 150) * 0.4 + 0.6;
+                ctx.strokeStyle = `rgba(255, 255, 255, ${pulse})`;
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.arc(apple.x, apple.y, apple.size / 2 + 5, 0, Math.PI * 2);
+                ctx.stroke();
+
+                // Extra sparkles for rainbow
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+                ctx.beginPath();
+                ctx.arc(apple.x - 5, apple.y - 5, 5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(apple.x + 4, apple.y - 3, 3, 0, Math.PI * 2);
+                ctx.fill();
+            } else if (apple.type === 'diamond' || apple.type === 'golden') {
                 ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
                 ctx.beginPath();
                 ctx.arc(apple.x - 5, apple.y - 5, 4, 0, Math.PI * 2);
@@ -758,8 +901,10 @@
                 if (checkCollision(gameState.koala, gameState.apples[i], gameState.koala.size, gameState.apples[i].size)) {
                     const apple = gameState.apples[i];
                     gameState.apples.splice(i, 1);
+                    const oldScore = gameState.score;
                     gameState.score += apple.points || 1;
                     updateScore();
+                    checkLuckMilestone(oldScore, gameState.score);
                     // Only spawn a new regular apple if we collected a regular one
                     if (apple.type === 'regular' || !apple.type) {
                         spawnApple();

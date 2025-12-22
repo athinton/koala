@@ -333,6 +333,11 @@
         function startScurryingSound() {
             if (scurryingSound) return;
 
+            // Resume audio context if suspended (required after user interaction)
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+
             const oscillator1 = audioCtx.createOscillator();
             const oscillator2 = audioCtx.createOscillator();
             const gainNode = audioCtx.createGain();
@@ -439,6 +444,7 @@
             gameState.kangaroo.y = Math.random() * (canvas.height - 100) + 50;
             gameState.apples = [];
             gameState.keys = {};
+            gameState.isMoving = false;
 
             document.getElementById('menuScreen').classList.add('hidden');
             document.getElementById('gameScreen').classList.remove('hidden');
@@ -503,7 +509,7 @@
                 size: type === 'rainbow' ? 35 : 30,
                 type: type,
                 spawnTime: Date.now(),
-                points: type === 'rainbow' ? 15 : type === 'diamond' ? 10 : type === 'golden' ? 5 : 1,
+                points: type === 'rainbow' ? 25 : type === 'diamond' ? 10 : type === 'golden' ? 5 : 1,
                 duration: type === 'diamond' ? 5000 : type === 'golden' ? 10000 : null
             };
             gameState.apples.push(apple);
@@ -813,28 +819,43 @@
 
             // Add sparkle effect for special apples
             if (apple.type === 'rainbow') {
-                // Rainbow glow effect
+                // Rainbow circle around the apple
+                const time = Date.now() / 300;
+                const radius = apple.size / 2 + 15;
+                ctx.lineWidth = 5;
+                const rainbowColors = ['#FF0000', '#FF7F00', '#FFFF00', '#00FF00', '#0000FF', '#8B00FF'];
+                const segmentAngle = (Math.PI * 2) / rainbowColors.length;
+                for (let i = 0; i < rainbowColors.length; i++) {
+                    const colorIndex = (i + Math.floor(time)) % rainbowColors.length;
+                    ctx.strokeStyle = rainbowColors[colorIndex];
+                    ctx.beginPath();
+                    ctx.arc(apple.x, apple.y, radius, i * segmentAngle, (i + 1) * segmentAngle);
+                    ctx.stroke();
+                }
+
+                // White glow effect
                 const pulse = Math.sin(Date.now() / 150) * 0.4 + 0.6;
                 ctx.strokeStyle = `rgba(255, 255, 255, ${pulse})`;
-                ctx.lineWidth = 4;
+                ctx.lineWidth = 2;
                 ctx.beginPath();
-                ctx.arc(apple.x, apple.y, apple.size / 2 + 5, 0, Math.PI * 2);
+                ctx.arc(apple.x, apple.y, apple.size / 2 + 3, 0, Math.PI * 2);
                 ctx.stroke();
 
-                // Extra sparkles for rainbow
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-                ctx.beginPath();
-                ctx.arc(apple.x - 5, apple.y - 5, 5, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.beginPath();
-                ctx.arc(apple.x + 4, apple.y - 3, 3, 0, Math.PI * 2);
-                ctx.fill();
+                // Multicolored sparkles for rainbow
+                const rainbowSparkleColors = ['#FF0000', '#FF7F00', '#FFFF00', '#00FF00', '#0000FF', '#8B00FF'];
+                const sparkleTime = Date.now() / 100;
+                for (let i = 0; i < 6; i++) {
+                    const angle = (i / 6) * Math.PI * 2 + sparkleTime * 0.5;
+                    const sparkleRadius = apple.size / 2 + 10 + Math.sin(sparkleTime + i) * 3;
+                    const sx = apple.x + Math.cos(angle) * sparkleRadius;
+                    const sy = apple.y + Math.sin(angle) * sparkleRadius;
+                    const sparkleSize = 3 + Math.sin(sparkleTime * 2 + i) * 1.5;
+                    ctx.fillStyle = rainbowSparkleColors[(i + Math.floor(sparkleTime)) % 6];
+                    ctx.beginPath();
+                    ctx.arc(sx, sy, sparkleSize, 0, Math.PI * 2);
+                    ctx.fill();
+                }
             } else if (apple.type === 'diamond' || apple.type === 'golden') {
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-                ctx.beginPath();
-                ctx.arc(apple.x - 5, apple.y - 5, 4, 0, Math.PI * 2);
-                ctx.fill();
-
                 // Pulsing glow effect
                 const pulse = Math.sin(Date.now() / 200) * 0.3 + 0.7;
                 ctx.strokeStyle = apple.type === 'diamond' ? `rgba(0, 255, 255, ${pulse})` : `rgba(255, 215, 0, ${pulse})`;
@@ -842,6 +863,21 @@
                 ctx.beginPath();
                 ctx.arc(apple.x, apple.y, apple.size / 2 + 3, 0, Math.PI * 2);
                 ctx.stroke();
+
+                // Colored sparkles
+                const sparkleColor = apple.type === 'diamond' ? '#00FFFF' : '#FFD700';
+                const sparkleTime = Date.now() / 150;
+                for (let i = 0; i < 4; i++) {
+                    const angle = (i / 4) * Math.PI * 2 + sparkleTime * 0.3;
+                    const sparkleRadius = apple.size / 2 + 8 + Math.sin(sparkleTime + i) * 2;
+                    const sx = apple.x + Math.cos(angle) * sparkleRadius;
+                    const sy = apple.y + Math.sin(angle) * sparkleRadius;
+                    const sparkleSize = 2.5 + Math.sin(sparkleTime * 2 + i) * 1;
+                    ctx.fillStyle = sparkleColor;
+                    ctx.beginPath();
+                    ctx.arc(sx, sy, sparkleSize, 0, Math.PI * 2);
+                    ctx.fill();
+                }
             }
 
             ctx.fillStyle = '#8B4513';

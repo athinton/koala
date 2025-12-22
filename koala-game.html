@@ -130,6 +130,77 @@
             align-items: center;
         }
 
+        #overlayControls {
+            display: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        #overlayControls.active {
+            display: block;
+        }
+
+        #overlayControls .overlay-btn {
+            position: absolute;
+            width: 60px;
+            height: 60px;
+            font-size: 22px;
+            border: 3px solid rgba(102, 126, 234, 0.7);
+            background: rgba(102, 126, 234, 0.4);
+            color: white;
+            border-radius: 15px;
+            cursor: pointer;
+            pointer-events: auto;
+            touch-action: manipulation;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        #overlayControls .overlay-btn:active {
+            background: rgba(118, 75, 162, 0.6);
+        }
+
+        #overlayControls.hidden-by-gamepad {
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        /* Left side controls */
+        #overlayLeft { left: 15px; bottom: 80px; }
+        #overlayDown { left: 15px; bottom: 10px; }
+
+        /* Right side controls */
+        #overlayRight { right: 15px; bottom: 80px; }
+        #overlayUp { right: 15px; bottom: 10px; }
+
+        #canvasContainer {
+            position: relative;
+            display: inline-block;
+        }
+
+        #fullscreenBtn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 40px;
+            height: 40px;
+            font-size: 20px;
+            background: rgba(0, 0, 0, 0.5);
+            color: white;
+            border: 2px solid rgba(255, 255, 255, 0.7);
+            border-radius: 8px;
+            cursor: pointer;
+            z-index: 10;
+        }
+
+        #fullscreenBtn:hover {
+            background: rgba(0, 0, 0, 0.7);
+        }
+
         .control-btn {
             width: 70px;
             height: 70px;
@@ -219,7 +290,7 @@
         /* Landscape mode on mobile */
         @media (max-height: 500px) {
             #gameCanvas {
-                max-height: 45vh;
+                max-height: 70vh;
                 margin: 5px auto;
             }
 
@@ -236,19 +307,13 @@
                 font-size: 1em;
             }
 
+            /* Hide regular controls, use overlay instead */
             #mobileControls {
-                padding: 5px;
-                gap: 5px;
+                display: none !important;
             }
 
-            .control-btn {
-                width: 50px;
-                height: 50px;
-                font-size: 18px;
-            }
-
-            .horizontal-controls {
-                gap: 5px;
+            #overlayControls {
+                display: block;
             }
         }
     </style>
@@ -283,7 +348,16 @@
                 </div>
                 <button id="endGameBtn" class="button hidden" onclick="endGame()" style="padding: 8px 16px; font-size: 0.9em;">End Game</button>
             </div>
-            <canvas id="gameCanvas" width="800" height="600"></canvas>
+            <div id="canvasContainer">
+                <canvas id="gameCanvas" width="800" height="600"></canvas>
+                <button id="fullscreenBtn" title="Toggle Fullscreen">⛶</button>
+                <div id="overlayControls">
+                    <button class="overlay-btn" id="overlayUp">▲</button>
+                    <button class="overlay-btn" id="overlayDown">▼</button>
+                    <button class="overlay-btn" id="overlayLeft">◀</button>
+                    <button class="overlay-btn" id="overlayRight">▶</button>
+                </div>
+            </div>
             <div id="mobileControls">
                 <button class="control-btn" id="upBtn">▲</button>
                 <div class="horizontal-controls">
@@ -1145,6 +1219,105 @@
                 gameState.keys[key] = false;
             });
         });
+
+        // Overlay controls
+        const overlayControlButtons = {
+            overlayUp: 'ArrowUp',
+            overlayDown: 'ArrowDown',
+            overlayLeft: 'ArrowLeft',
+            overlayRight: 'ArrowRight'
+        };
+
+        Object.keys(overlayControlButtons).forEach(btnId => {
+            const button = document.getElementById(btnId);
+            const key = overlayControlButtons[btnId];
+
+            button.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                gameState.keys[key] = true;
+            });
+
+            button.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                gameState.keys[key] = false;
+            });
+
+            button.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                gameState.keys[key] = true;
+            });
+
+            button.addEventListener('mouseup', (e) => {
+                e.preventDefault();
+                gameState.keys[key] = false;
+            });
+
+            button.addEventListener('touchcancel', (e) => {
+                e.preventDefault();
+                gameState.keys[key] = false;
+            });
+
+            button.addEventListener('mouseleave', (e) => {
+                gameState.keys[key] = false;
+            });
+        });
+
+        // Fullscreen toggle
+        document.getElementById('fullscreenBtn').addEventListener('click', () => {
+            const container = document.getElementById('gameScreen');
+            if (!document.fullscreenElement) {
+                if (container.requestFullscreen) {
+                    container.requestFullscreen();
+                } else if (container.webkitRequestFullscreen) {
+                    container.webkitRequestFullscreen();
+                } else if (container.msRequestFullscreen) {
+                    container.msRequestFullscreen();
+                }
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                } else if (document.webkitExitFullscreen) {
+                    document.webkitExitFullscreen();
+                }
+            }
+        });
+
+        // Gamepad activity detection - hide overlay when gamepad is used
+        let gamepadActivityTimeout = null;
+        let lastGamepadActivity = 0;
+
+        function checkGamepadActivity() {
+            const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+            const overlay = document.getElementById('overlayControls');
+
+            for (const gamepad of gamepads) {
+                if (!gamepad) continue;
+
+                // Check if any button is pressed or stick is moved
+                const hasButtonPress = gamepad.buttons.some(b => b.pressed);
+                const hasStickMove = gamepad.axes.some(a => Math.abs(a) > 0.3);
+
+                if (hasButtonPress || hasStickMove) {
+                    lastGamepadActivity = Date.now();
+                    overlay.classList.add('hidden-by-gamepad');
+
+                    // Clear existing timeout
+                    if (gamepadActivityTimeout) {
+                        clearTimeout(gamepadActivityTimeout);
+                    }
+
+                    // Set timeout to show controls again after 10 seconds of inactivity
+                    gamepadActivityTimeout = setTimeout(() => {
+                        overlay.classList.remove('hidden-by-gamepad');
+                    }, 10000);
+
+                    break;
+                }
+            }
+        }
+
+        // Check gamepad activity periodically
+        setInterval(checkGamepadActivity, 100);
     </script>
 </body>
 </html>

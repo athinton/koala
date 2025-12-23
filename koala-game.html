@@ -314,6 +314,151 @@
             100% { opacity: 0; transform: translate(-50%, -60%) scale(0.8); }
         }
 
+        /* Shop styles */
+        #shopScreen {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        #shopScreen h2 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .shop-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .coin-display {
+            background: linear-gradient(135deg, #FFD700, #FFA500);
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .shop-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .shop-tab {
+            padding: 10px 20px;
+            border: 2px solid #667eea;
+            background: white;
+            color: #667eea;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+
+        .shop-tab.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .shop-items {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 15px;
+        }
+
+        .shop-item {
+            border: 2px solid #ddd;
+            border-radius: 15px;
+            padding: 15px;
+            text-align: center;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+        .shop-item:hover {
+            border-color: #667eea;
+            transform: translateY(-2px);
+        }
+
+        .shop-item.owned {
+            border-color: #27ae60;
+            background: #e8f5e9;
+        }
+
+        .shop-item.equipped {
+            border-color: #FFD700;
+            background: linear-gradient(135deg, #fff9e6, #fff3cc);
+            box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+        }
+
+        .shop-item-preview {
+            width: 60px;
+            height: 60px;
+            margin: 0 auto 10px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 30px;
+        }
+
+        .shop-item-name {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .shop-item-cost {
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .shop-item-cost.free {
+            color: #27ae60;
+        }
+
+        .shop-locked {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .shop-locked h2 {
+            color: #333;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #ddd;
+            border-radius: 10px;
+            margin: 20px 0;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            transition: width 0.3s;
+        }
+
+        .total-apples-display {
+            background: #f0f0f0;
+            padding: 10px 15px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            font-size: 0.9em;
+        }
+
         @media (max-width: 900px) {
             #gameCanvas {
                 max-width: 100%;
@@ -383,6 +528,10 @@
             <button class="button" onclick="startGame(120)">2 Minutes</button>
             <button class="button" onclick="startGame(180)">3 Minutes</button>
             <button class="button" onclick="startGame(0)">Endless</button>
+            <div style="margin-top: 20px;">
+                <button id="shopBtn" class="button" onclick="openShop()" style="background: linear-gradient(135deg, #FFD700, #FFA500);">🛒 Shop</button>
+            </div>
+            <div id="menuStats" style="margin-top: 15px; font-size: 0.9em; color: #666;"></div>
             <div id="instructions">
                 <p>Use Arrow Keys to move the koala</p>
                 <p>Collect apples to score points!</p>
@@ -423,7 +572,20 @@
         <div id="gameOverScreen" class="hidden">
             <h1>Game Over!</h1>
             <div id="finalScore">Score: 0</div>
+            <div id="coinsEarned" style="color: #FFD700; font-size: 1.2em; margin: 10px 0;"></div>
             <button class="button" onclick="returnToMenu()">Play Again</button>
+        </div>
+
+        <div id="shopScreen" class="hidden">
+            <div class="shop-header">
+                <h1>🛒 Koala Shop</h1>
+                <div class="coin-display">🪙 <span id="shopCoins">0</span> Coins</div>
+            </div>
+            <div class="total-apples-display">
+                🍎 Total Apples Collected: <span id="totalApplesDisplay">0</span>
+            </div>
+            <div id="shopContent"></div>
+            <button class="button" onclick="closeShop()" style="margin-top: 20px;">Back to Menu</button>
         </div>
     </div>
 
@@ -433,6 +595,78 @@
 
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         let scurryingSound = null;
+
+        // Shop system - persistent storage
+        const shopData = {
+            backgrounds: [
+                { id: 'default', name: 'Classic Blue', color: '#f0f8ff', cost: 0, owned: true },
+                { id: 'forest', name: 'Forest Green', color: '#228B22', cost: 50, owned: false },
+                { id: 'sunset', name: 'Sunset Orange', color: '#FF6B35', cost: 75, owned: false },
+                { id: 'night', name: 'Night Sky', color: '#1a1a2e', cost: 100, owned: false },
+                { id: 'pink', name: 'Cotton Candy', color: '#FFB6C1', cost: 60, owned: false },
+                { id: 'rainbow', name: 'Rainbow', color: 'rainbow', cost: 200, owned: false }
+            ],
+            accessories: [
+                { id: 'none', name: 'None', cost: 0, owned: true },
+                { id: 'hat', name: 'Top Hat', cost: 80, owned: false },
+                { id: 'crown', name: 'Crown', cost: 150, owned: false },
+                { id: 'bow', name: 'Bow Tie', cost: 60, owned: false },
+                { id: 'glasses', name: 'Cool Glasses', cost: 70, owned: false },
+                { id: 'cape', name: 'Super Cape', cost: 120, owned: false }
+            ],
+            chasers: [
+                { id: 'kangaroo', name: 'Kangaroo', cost: 0, owned: true },
+                { id: 'fox', name: 'Sneaky Fox', color: '#D35400', cost: 100, owned: false },
+                { id: 'wolf', name: 'Grey Wolf', color: '#7F8C8D', cost: 120, owned: false },
+                { id: 'bear', name: 'Brown Bear', color: '#8B4513', cost: 150, owned: false },
+                { id: 'ghost', name: 'Spooky Ghost', color: '#ECF0F1', cost: 200, owned: false }
+            ]
+        };
+
+        let playerData = {
+            totalApples: 0,
+            koalaCoins: 0,
+            shopUnlocked: false,
+            equipped: {
+                background: 'default',
+                accessory: 'none',
+                chaser: 'kangaroo'
+            }
+        };
+
+        // Load saved data
+        function loadPlayerData() {
+            const saved = localStorage.getItem('koalaGameData');
+            if (saved) {
+                const data = JSON.parse(saved);
+                playerData = { ...playerData, ...data.playerData };
+                // Restore owned items
+                if (data.shopData) {
+                    ['backgrounds', 'accessories', 'chasers'].forEach(category => {
+                        if (data.shopData[category]) {
+                            data.shopData[category].forEach(savedItem => {
+                                const item = shopData[category].find(i => i.id === savedItem.id);
+                                if (item) item.owned = savedItem.owned;
+                            });
+                        }
+                    });
+                }
+            }
+        }
+
+        function savePlayerData() {
+            const data = {
+                playerData,
+                shopData: {
+                    backgrounds: shopData.backgrounds.map(i => ({ id: i.id, owned: i.owned })),
+                    accessories: shopData.accessories.map(i => ({ id: i.id, owned: i.owned })),
+                    chasers: shopData.chasers.map(i => ({ id: i.id, owned: i.owned }))
+                }
+            };
+            localStorage.setItem('koalaGameData', JSON.stringify(data));
+        }
+
+        loadPlayerData();
 
         let gameState = {
             score: 0,
@@ -548,16 +782,21 @@
         function stopScurryingSound() {
             if (!scurryingSound) return;
 
+            // Save reference and immediately clear so new sound can start
+            const soundToStop = scurryingSound;
+            scurryingSound = null;
+
             const now = audioCtx.currentTime;
-            scurryingSound.gainNode.gain.setValueAtTime(scurryingSound.gainNode.gain.value, now);
-            scurryingSound.gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+            soundToStop.gainNode.gain.setValueAtTime(soundToStop.gainNode.gain.value, now);
+            soundToStop.gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
 
             setTimeout(() => {
-                if (scurryingSound) {
-                    scurryingSound.oscillator1.stop();
-                    scurryingSound.oscillator2.stop();
-                    clearInterval(scurryingSound.interval);
-                    scurryingSound = null;
+                try {
+                    soundToStop.oscillator1.stop();
+                    soundToStop.oscillator2.stop();
+                    clearInterval(soundToStop.interval);
+                } catch (e) {
+                    // Oscillators may already be stopped
                 }
             }, 150);
         }
@@ -657,14 +896,29 @@
             clearInterval(timerInterval);
             stopScurryingSound();
 
+            // Award coins (2 points = 1 coin)
+            const coinsEarned = Math.floor(gameState.score / 2);
+            playerData.totalApples += gameState.score;
+            playerData.koalaCoins += coinsEarned;
+
+            // Check if shop should be unlocked
+            if (playerData.totalApples >= 1000 && !playerData.shopUnlocked) {
+                playerData.shopUnlocked = true;
+                alert('🎉 Shop Unlocked! You can now customize your koala!');
+            }
+
+            savePlayerData();
+
             document.getElementById('gameScreen').classList.add('hidden');
             document.getElementById('gameOverScreen').classList.remove('hidden');
             document.getElementById('finalScore').textContent = `Score: ${gameState.score}`;
+            document.getElementById('coinsEarned').textContent = `+${coinsEarned} 🪙 Koala Coins`;
         }
 
         function returnToMenu() {
             document.getElementById('gameOverScreen').classList.add('hidden');
             document.getElementById('menuScreen').classList.remove('hidden');
+            updateMenuStats();
         }
 
         function spawnApple(type = 'regular') {
@@ -947,6 +1201,193 @@
             ctx.stroke();
         }
 
+        function drawChaser() {
+            const chaserId = playerData.equipped.chaser;
+            if (chaserId === 'kangaroo') {
+                drawKangaroo();
+                return;
+            }
+
+            const kan = gameState.kangaroo;
+            const chaserItem = shopData.chasers.find(c => c.id === chaserId);
+            const color = chaserItem ? chaserItem.color : '#A0917B';
+
+            if (chaserId === 'ghost') {
+                // Ghost chaser - floaty translucent
+                ctx.globalAlpha = 0.7 + Math.sin(Date.now() / 200) * 0.2;
+                ctx.fillStyle = '#ECF0F1';
+                ctx.beginPath();
+                ctx.ellipse(kan.x, kan.y, 25, 30, 0, 0, Math.PI * 2);
+                ctx.fill();
+                // Eyes
+                ctx.fillStyle = '#2C3E50';
+                ctx.beginPath();
+                ctx.arc(kan.x - 8, kan.y - 5, 5, 0, Math.PI * 2);
+                ctx.arc(kan.x + 8, kan.y - 5, 5, 0, Math.PI * 2);
+                ctx.fill();
+                // Wavy bottom
+                ctx.fillStyle = '#ECF0F1';
+                ctx.beginPath();
+                const waveTime = Date.now() / 150;
+                ctx.moveTo(kan.x - 25, kan.y + 15);
+                for (let i = 0; i <= 5; i++) {
+                    const x = kan.x - 25 + i * 10;
+                    const y = kan.y + 25 + Math.sin(waveTime + i) * 5;
+                    ctx.lineTo(x, y);
+                }
+                ctx.lineTo(kan.x + 25, kan.y + 15);
+                ctx.fill();
+                ctx.globalAlpha = 1;
+            } else {
+                // Generic animal chaser (fox, wolf, bear)
+                // Body
+                ctx.fillStyle = color;
+                ctx.beginPath();
+                ctx.ellipse(kan.x, kan.y + 5, 22, 28, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Head
+                ctx.beginPath();
+                ctx.arc(kan.x, kan.y - 20, 18, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Ears
+                ctx.beginPath();
+                ctx.moveTo(kan.x - 15, kan.y - 30);
+                ctx.lineTo(kan.x - 10, kan.y - 45);
+                ctx.lineTo(kan.x - 5, kan.y - 30);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.moveTo(kan.x + 5, kan.y - 30);
+                ctx.lineTo(kan.x + 10, kan.y - 45);
+                ctx.lineTo(kan.x + 15, kan.y - 30);
+                ctx.fill();
+
+                // Snout
+                const lighterColor = chaserId === 'wolf' ? '#95A5A6' : (chaserId === 'bear' ? '#A0522D' : '#E67E22');
+                ctx.fillStyle = lighterColor;
+                ctx.beginPath();
+                ctx.ellipse(kan.x, kan.y - 12, 10, 8, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Eyes
+                ctx.fillStyle = '#2C3E50';
+                ctx.beginPath();
+                ctx.arc(kan.x - 7, kan.y - 22, 3, 0, Math.PI * 2);
+                ctx.arc(kan.x + 7, kan.y - 22, 3, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Nose
+                ctx.fillStyle = '#1a1a1a';
+                ctx.beginPath();
+                ctx.arc(kan.x, kan.y - 10, 4, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Legs
+                ctx.fillStyle = color;
+                ctx.fillRect(kan.x - 18, kan.y + 25, 10, 20);
+                ctx.fillRect(kan.x + 8, kan.y + 25, 10, 20);
+            }
+        }
+
+        function drawAccessory() {
+            const accessoryId = playerData.equipped.accessory;
+            if (accessoryId === 'none') return;
+
+            const k = gameState.koala;
+
+            ctx.save();
+            ctx.translate(k.x, k.y);
+            ctx.rotate(k.rotation);
+
+            switch (accessoryId) {
+                case 'hat':
+                    // Top hat
+                    ctx.fillStyle = '#1a1a1a';
+                    ctx.fillRect(-12, -k.size/2 - 25, 24, 20);
+                    ctx.fillRect(-18, -k.size/2 - 8, 36, 8);
+                    ctx.fillStyle = '#8B0000';
+                    ctx.fillRect(-12, -k.size/2 - 12, 24, 4);
+                    break;
+
+                case 'crown':
+                    // Crown
+                    ctx.fillStyle = '#FFD700';
+                    ctx.beginPath();
+                    ctx.moveTo(-15, -k.size/2 - 5);
+                    ctx.lineTo(-18, -k.size/2 - 20);
+                    ctx.lineTo(-10, -k.size/2 - 12);
+                    ctx.lineTo(0, -k.size/2 - 25);
+                    ctx.lineTo(10, -k.size/2 - 12);
+                    ctx.lineTo(18, -k.size/2 - 20);
+                    ctx.lineTo(15, -k.size/2 - 5);
+                    ctx.closePath();
+                    ctx.fill();
+                    // Gems
+                    ctx.fillStyle = '#E74C3C';
+                    ctx.beginPath();
+                    ctx.arc(0, -k.size/2 - 12, 4, 0, Math.PI * 2);
+                    ctx.fill();
+                    break;
+
+                case 'bow':
+                    // Bow tie
+                    ctx.fillStyle = '#E74C3C';
+                    ctx.beginPath();
+                    ctx.moveTo(0, k.size/2 - 5);
+                    ctx.lineTo(-15, k.size/2 - 15);
+                    ctx.lineTo(-15, k.size/2 + 5);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.moveTo(0, k.size/2 - 5);
+                    ctx.lineTo(15, k.size/2 - 15);
+                    ctx.lineTo(15, k.size/2 + 5);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.arc(0, k.size/2 - 5, 5, 0, Math.PI * 2);
+                    ctx.fill();
+                    break;
+
+                case 'glasses':
+                    // Cool sunglasses
+                    ctx.fillStyle = '#1a1a1a';
+                    ctx.fillRect(-20, -8, 15, 10);
+                    ctx.fillRect(5, -8, 15, 10);
+                    ctx.fillRect(-5, -5, 10, 3);
+                    ctx.strokeStyle = '#1a1a1a';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(-20, -3);
+                    ctx.lineTo(-25, -8);
+                    ctx.moveTo(20, -3);
+                    ctx.lineTo(25, -8);
+                    ctx.stroke();
+                    break;
+
+                case 'cape':
+                    // Super cape (drawn behind, so we use negative z-order trick)
+                    ctx.fillStyle = '#E74C3C';
+                    ctx.beginPath();
+                    ctx.moveTo(-15, 0);
+                    ctx.quadraticCurveTo(-25, k.size/2, -20, k.size + 10);
+                    ctx.lineTo(20, k.size + 10);
+                    ctx.quadraticCurveTo(25, k.size/2, 15, 0);
+                    ctx.closePath();
+                    ctx.fill();
+                    // Cape flutter
+                    ctx.fillStyle = '#C0392B';
+                    ctx.beginPath();
+                    ctx.moveTo(-10, k.size/2);
+                    ctx.quadraticCurveTo(0, k.size + 5, 10, k.size/2);
+                    ctx.fill();
+                    break;
+            }
+
+            ctx.restore();
+        }
+
         function drawApple(apple) {
             // Set color based on apple type
             if (apple.type === 'rainbow') {
@@ -1195,13 +1636,32 @@
         }
 
         function draw() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // Draw background based on equipped customization
+            const bgItem = shopData.backgrounds.find(b => b.id === playerData.equipped.background);
+            if (bgItem && bgItem.color === 'rainbow') {
+                const time = Date.now() / 2000;
+                const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+                gradient.addColorStop((0 + time) % 1, '#FF0000');
+                gradient.addColorStop((0.17 + time) % 1, '#FF7F00');
+                gradient.addColorStop((0.33 + time) % 1, '#FFFF00');
+                gradient.addColorStop((0.5 + time) % 1, '#00FF00');
+                gradient.addColorStop((0.67 + time) % 1, '#0000FF');
+                gradient.addColorStop((0.83 + time) % 1, '#8B00FF');
+                ctx.fillStyle = gradient;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            } else if (bgItem && bgItem.color !== '#f0f8ff') {
+                ctx.fillStyle = bgItem.color;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            } else {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            }
 
             gameState.apples.forEach(apple => drawApple(apple));
             if (gameState.kangarooEnabled) {
-                drawKangaroo();
+                drawChaser();
             }
             drawKoala();
+            drawAccessory();
         }
 
         function gameLoop() {
@@ -1396,6 +1856,138 @@
 
         // Check gamepad activity periodically
         setInterval(checkGamepadActivity, 100);
+
+        // Shop functions
+        function openShop() {
+            document.getElementById('menuScreen').classList.add('hidden');
+            document.getElementById('shopScreen').classList.remove('hidden');
+            updateShopDisplay();
+        }
+
+        function closeShop() {
+            document.getElementById('shopScreen').classList.add('hidden');
+            document.getElementById('menuScreen').classList.remove('hidden');
+            updateMenuStats();
+        }
+
+        function updateShopDisplay() {
+            document.getElementById('shopCoins').textContent = playerData.koalaCoins;
+            document.getElementById('totalApplesDisplay').textContent = playerData.totalApples;
+
+            const content = document.getElementById('shopContent');
+
+            if (!playerData.shopUnlocked) {
+                const progress = Math.min((playerData.totalApples / 1000) * 100, 100);
+                content.innerHTML = `
+                    <div class="shop-locked">
+                        <h2>🔒 Shop Locked</h2>
+                        <p>Collect 1,000 apples to unlock the shop!</p>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: ${progress}%"></div>
+                        </div>
+                        <p>${playerData.totalApples} / 1,000 apples</p>
+                    </div>
+                `;
+                return;
+            }
+
+            content.innerHTML = `
+                <div class="shop-tabs">
+                    <button class="shop-tab active" onclick="showShopCategory('backgrounds')">🎨 Backgrounds</button>
+                    <button class="shop-tab" onclick="showShopCategory('accessories')">🎩 Accessories</button>
+                    <button class="shop-tab" onclick="showShopCategory('chasers')">🦊 Chasers</button>
+                </div>
+                <div id="shopItemsContainer" class="shop-items"></div>
+            `;
+            showShopCategory('backgrounds');
+        }
+
+        function showShopCategory(category) {
+            // Update active tab
+            document.querySelectorAll('.shop-tab').forEach(tab => tab.classList.remove('active'));
+            event.target.classList.add('active');
+
+            const container = document.getElementById('shopItemsContainer');
+            const items = shopData[category];
+            const equippedId = playerData.equipped[category === 'backgrounds' ? 'background' :
+                               category === 'accessories' ? 'accessory' : 'chaser'];
+
+            container.innerHTML = items.map(item => {
+                const isEquipped = item.id === equippedId;
+                const classes = ['shop-item'];
+                if (item.owned) classes.push('owned');
+                if (isEquipped) classes.push('equipped');
+
+                let preview = '';
+                if (category === 'backgrounds') {
+                    if (item.color === 'rainbow') {
+                        preview = `<div class="shop-item-preview" style="background: linear-gradient(135deg, red, orange, yellow, green, blue, purple);"></div>`;
+                    } else {
+                        preview = `<div class="shop-item-preview" style="background: ${item.color};"></div>`;
+                    }
+                } else if (category === 'accessories') {
+                    const emojis = { none: '❌', hat: '🎩', crown: '👑', bow: '🎀', glasses: '🕶️', cape: '🦸' };
+                    preview = `<div class="shop-item-preview">${emojis[item.id] || '?'}</div>`;
+                } else {
+                    const emojis = { kangaroo: '🦘', fox: '🦊', wolf: '🐺', bear: '🐻', ghost: '👻' };
+                    preview = `<div class="shop-item-preview">${emojis[item.id] || '?'}</div>`;
+                }
+
+                const costText = item.cost === 0 ? '<span class="free">Free</span>' : `🪙 ${item.cost}`;
+                const statusText = isEquipped ? '✓ Equipped' : (item.owned ? 'Owned' : costText);
+
+                return `
+                    <div class="${classes.join(' ')}" onclick="handleShopItem('${category}', '${item.id}')">
+                        ${preview}
+                        <div class="shop-item-name">${item.name}</div>
+                        <div class="shop-item-cost ${item.cost === 0 ? 'free' : ''}">${statusText}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function handleShopItem(category, itemId) {
+            const item = shopData[category].find(i => i.id === itemId);
+            if (!item) return;
+
+            if (item.owned) {
+                // Equip it
+                const equipKey = category === 'backgrounds' ? 'background' :
+                                 category === 'accessories' ? 'accessory' : 'chaser';
+                playerData.equipped[equipKey] = itemId;
+                savePlayerData();
+                showShopCategory(category);
+            } else if (playerData.koalaCoins >= item.cost) {
+                // Purchase it
+                playerData.koalaCoins -= item.cost;
+                item.owned = true;
+                // Auto-equip on purchase
+                const equipKey = category === 'backgrounds' ? 'background' :
+                                 category === 'accessories' ? 'accessory' : 'chaser';
+                playerData.equipped[equipKey] = itemId;
+                savePlayerData();
+                document.getElementById('shopCoins').textContent = playerData.koalaCoins;
+                showShopCategory(category);
+            } else {
+                alert('Not enough Koala Coins!');
+            }
+        }
+
+        function updateMenuStats() {
+            const stats = document.getElementById('menuStats');
+            stats.innerHTML = `🍎 ${playerData.totalApples} apples | 🪙 ${playerData.koalaCoins} coins`;
+
+            // Update shop button appearance based on unlock status
+            const shopBtn = document.getElementById('shopBtn');
+            if (playerData.shopUnlocked) {
+                shopBtn.textContent = '🛒 Shop';
+            } else {
+                shopBtn.textContent = `🔒 Shop (${playerData.totalApples}/1000)`;
+            }
+        }
+
+        // Initialize menu stats on load
+        updateMenuStats();
     </script>
 </body>
 </html>

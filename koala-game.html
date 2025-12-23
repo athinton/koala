@@ -711,14 +711,22 @@
             // Luck ranges from 0.5 (base) to 2 (max at level 3)
             // Bar shows 0% at 0.5 luck, 100% at 2 luck
             const percentage = ((gameState.luck - 0.5) / 1.5) * 100;
-            document.getElementById('luckFill').style.width = `${percentage}%`;
+            const luckFill = document.getElementById('luckFill');
+            luckFill.style.width = `${percentage}%`;
+
+            // Rainbow gradient at max luck
+            if (gameState.luckLevel >= 3) {
+                luckFill.style.background = 'linear-gradient(90deg, #FF0000, #FF7F00, #FFFF00, #00FF00, #0000FF, #8B00FF)';
+            } else {
+                luckFill.style.background = 'linear-gradient(90deg, #FFD700, #FFA500)';
+            }
         }
 
         function showLuckNotification(level) {
             const messages = {
                 1: '🍀 Luck Up! (1.5x)',
                 2: '🍀🍀 Luck Up! (2x)',
-                3: '🍀🍀🍀 MAX LUCK!'
+                3: '🌈 MAX LUCK! Rainbow Apple Unlocked!'
             };
             const notification = document.createElement('div');
             notification.id = 'luckNotification';
